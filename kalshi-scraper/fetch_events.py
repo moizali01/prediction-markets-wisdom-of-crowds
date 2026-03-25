@@ -66,7 +66,7 @@ def scrape_all_events() :
                     print(f"Received unknown payload type : {payload},{type(payload)}")
                     break
 
-                if  payload['cursor'] == None or len(payload['events']) == 0 :
+                if  payload['cursor'] == '' or len(payload['events']) == 0 :
                     print("No data returned. Done scraping!")
                     break
 
@@ -82,8 +82,7 @@ def scrape_all_events() :
                 resp_count += len(payload['events'])
 
                 # Move on to the next page of responses
-                if state['cursor'] == None and payload['cursor'] :
-                    state['cursor'] = payload['cursor']
+                state['cursor'] = payload['cursor']
 
                 spinner.text = f"Scraped {resp_count} records"
 
