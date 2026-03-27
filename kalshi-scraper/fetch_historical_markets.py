@@ -2,7 +2,7 @@ import signal
 import sys
 import pickle
 import requests
-from os import path
+import os
 
 import backoff
 from requests_ratelimiter import LimiterSession
@@ -28,6 +28,9 @@ def scrape_all_markets() :
         state = {
             'cursor' : None,
         }
+
+    if not os.path.isdir("./historical_markets_resps/") :
+        os.mkdir('./historical_markets_resps/')
 
     def sighandler(signum,frame) :
         # Create a checkpoint
@@ -70,7 +73,7 @@ def scrape_all_markets() :
                     print("No data returned. Done scraping!")
                     break
 
-                with open(f"resps/resp_{resp_count}.jsonl","w") as f :
+                with open(f"historical_markets_resps/resp_{resp_count}.jsonl","w") as f :
                     # Create a local copy of the response
                     f.write(str(payload))
 

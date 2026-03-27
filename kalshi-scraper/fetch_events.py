@@ -2,7 +2,7 @@ import signal
 import sys
 import pickle
 import requests
-from os import path
+import os
 
 import backoff
 from requests_ratelimiter import LimiterSession
@@ -22,12 +22,14 @@ def scrape_all_events() :
     try :
         state = pickle.load(open(checkpoint_path,'rb'))
     except :
-
         print(f"No checkpoint file found under {checkpoint_path}. Starting from scratch")
 
         state = {
             'cursor' : None,
         }
+
+    if not os.path.isdir("./events_resps/") :
+        os.mkdir('./events_resps/')
 
     def sighandler(signum,frame) :
         # Create a checkpoint
@@ -70,7 +72,7 @@ def scrape_all_events() :
                     print("No data returned. Done scraping!")
                     break
 
-                with open(f"resps/resp_{resp_count}.jsonl","w") as f :
+                with open(f"events_resps/resp_{resp_count}.jsonl","w") as f :
                     # Create a local copy of the response
                     f.write(str(payload))
 

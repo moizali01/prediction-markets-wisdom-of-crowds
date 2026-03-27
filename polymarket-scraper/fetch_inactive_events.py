@@ -10,14 +10,17 @@ from sqlite_utils import Database
 from yaspin import yaspin
 
 def setup_db() :
-    db = Database('events.db')
+    db = Database('inactive_events.db')
+
     return db
 
-def scrape_all_events() :
+
+
+def scrape_all_inactive_events() :
 
     db = setup_db()
-    session = LimiterSession(per_second=4) # Rate limit to 5 requests per second
-    checkpoint_path = './events_checkpoint.pkl'
+    session = LimiterSession(per_second=5) # Rate limit to 5 requests per second
+    checkpoint_path = './inactive_events_checkpoint.pkl'
 
     try :
         state = pickle.load(open(checkpoint_path,'rb'))
@@ -26,12 +29,13 @@ def scrape_all_events() :
         print(f"No checkpoint file found under {checkpoint_path}. Starting from scratch")
 
         state = {
-            'cursor' : None,
+            'offset' : 0,
+            'inactive' : True,
         }
 
     def sighandler(signum,frame) :
         # Create a checkpoint
-        with open("events_checkpoint.pkl","wb") as f:
+        with open("inactive_events_checkpoint.pkl","wb") as f:
             pickle.dump(state,f)
 
         sys.exit()
@@ -45,13 +49,10 @@ def scrape_all_events() :
 
     try : 
         with yaspin(text="Processing...",timer=True) as spinner :
-
-            resp_count = 0
-
             while True : 
-                resp = list_events(session,{
+                resp = list_inactive_events(session,{
                     'params' : {
-                        'limit' : '200',
+                        'limit' : '100',
                         **state
                     }
                 })
@@ -62,35 +63,33 @@ def scrape_all_events() :
                     print(f"Couldn't decode response as JSON : {e}")
                     break
 
-                if 'events' not in payload or not isinstance(payload,dict) :
+                if not isinstance(payload,list) :
                     print(f"Received unknown payload type : {payload},{type(payload)}")
                     break
 
-                if  payload['cursor'] == '' or len(payload['events']) == 0 :
+                if len(payload) == 0 :
                     print("No data returned. Done scraping!")
                     break
 
-                with open(f"resps/resp_{resp_count}.jsonl","w") as f :
+                with open(f"resps/resp_{state['offset']}.jsonl","w") as f :
                     # Create a local copy of the response
                     f.write(str(payload))
 
-                db["events"].insert_all(
-                    payload['events'],
+                db["inactive_events"].insert_all(
+                    payload,
                     alter=True,
                 )
 
-                resp_count += len(payload['events'])
-
                 # Move on to the next page of responses
-                state['cursor'] = payload['cursor']
+                state['offset'] += min(100,len(payload))
 
-                spinner.text = f"Scraped {resp_count} records"
+                spinner.text = f"Scraping {state['offset']}th record"
 
     except Exception as e :
         print(f"Unknown exception occurred. Error : {e}")
 
     # Create a checkpoint
-    with open("events_checkpoint.pkl","wb") as f:
+    with open("inactive_events_checkpoint.pkl","wb") as f:
         pickle.dump(state,f)
 
     return
@@ -98,13 +97,13 @@ def scrape_all_events() :
 @backoff.on_exception(backoff.expo,
                       requests.exceptions.RequestException,
                       max_tries=5)
-def list_events(session : requests.Session, args : dict):
+def list_inactive_events(session : requests.Session, args : dict):
 
-    url = 'https://api.elections.kalshi.com/trade-api/v2/events'
+    url = 'https://gamma-api.polymarket.com/inactive_events'
     resp : requests.Response = session.get(url,**args)
 
     return resp
 
 
 if __name__ == "__main__" :
-    scrape_all_events()
+    scrape_all_inactive_events()
