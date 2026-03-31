@@ -2,3 +2,7 @@ polymarket-scraper/resps
 polymarket-scraper/events.db
 kalshi-scraper/events.db
 kalshi-scraper/resps
+kalshi-scraper/markets_resps
+kalshi-scraper/multivariate_resps
+kalshi-scraper/markets.db
+kalshi-scraper/multivariate.db
