@@ -6,3 +6,9 @@ kalshi-scraper/markets_resps
 kalshi-scraper/multivariate_resps
 kalshi-scraper/markets.db
 kalshi-scraper/multivariate.db
+
+
+.DS_Store
+events.db.gz
+
+kaggle-dataset/*.csv
