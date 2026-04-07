@@ -14,8 +14,6 @@ def setup_db() :
 
     return db
 
-
-
 def scrape_all_inactive_events() :
 
     db = setup_db()
@@ -30,7 +28,8 @@ def scrape_all_inactive_events() :
 
         state = {
             'offset' : 0,
-            'inactive' : True,
+            'active' : 'false',
+            'closed' : 'true',
         }
 
     def sighandler(signum,frame) :
@@ -99,11 +98,10 @@ def scrape_all_inactive_events() :
                       max_tries=5)
 def list_inactive_events(session : requests.Session, args : dict):
 
-    url = 'https://gamma-api.polymarket.com/inactive_events'
+    url = 'https://gamma-api.polymarket.com/events'
     resp : requests.Response = session.get(url,**args)
 
     return resp
-
 
 if __name__ == "__main__" :
     scrape_all_inactive_events()

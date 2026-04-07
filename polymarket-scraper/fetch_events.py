@@ -14,8 +14,6 @@ def setup_db() :
 
     return db
 
-
-
 def scrape_all_events() :
 
     db = setup_db()
