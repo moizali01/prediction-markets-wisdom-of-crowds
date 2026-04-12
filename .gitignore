@@ -15,3 +15,6 @@ kaggle-dataset/*.csv
 **/.ipynb_checkpoints/**
 polymarket-scraper/.env
 polymarket-scraper/inactive_events.db
+
+
+progress_report copy.ipynb
