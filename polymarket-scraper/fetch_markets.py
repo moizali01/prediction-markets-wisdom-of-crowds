@@ -9,66 +9,63 @@ from requests_ratelimiter import LimiterSession
 from sqlite_utils import Database
 from yaspin import yaspin
 
-def setup_db() :
-    db = Database('markets.db')
+
+def setup_db():
+    db = Database("markets.db")
 
     return db
 
-def scrape_all_markets() :
+
+def scrape_all_markets():
 
     db = setup_db()
-    session = LimiterSession(per_second=5) # Rate limit to 5 requests per second
-    checkpoint_path = './markets_checkpoint.pkl'
+    session = LimiterSession(per_second=5)  # Rate limit to 5 requests per second
+    checkpoint_path = "./markets_checkpoint.pkl"
 
-    try :
-        state = pickle.load(open(checkpoint_path,'rb'))
-    except :
-
-        print(f"No checkpoint file found under {checkpoint_path}. Starting from scratch")
+    try:
+        state = pickle.load(open(checkpoint_path, "rb"))
+    except Exception:
+        print(
+            f"No checkpoint file found under {checkpoint_path}. Starting from scratch"
+        )
 
         state = {
-            'offset' : 0,
+            "offset": 0,
         }
 
-    def sighandler(signum,frame) :
+    def sighandler(signum, frame):
         # Create a checkpoint
-        with open("markets_checkpoint.pkl","wb") as f:
-            pickle.dump(state,f)
+        with open("markets_checkpoint.pkl", "wb") as f:
+            pickle.dump(state, f)
 
         sys.exit()
 
     # Register signal handlers to save checkpoints
-    signal.signal(signal.SIGINT,sighandler)
-    signal.signal(signal.SIGQUIT,sighandler)
-    signal.signal(signal.SIGSEGV,sighandler)
-    signal.signal(signal.SIGTERM,sighandler)
+    signal.signal(signal.SIGINT, sighandler)
+    signal.signal(signal.SIGQUIT, sighandler)
+    signal.signal(signal.SIGSEGV, sighandler)
+    signal.signal(signal.SIGTERM, sighandler)
 
+    try:
+        with yaspin(text="Processing...", timer=True) as spinner:
+            while True:
+                resp = list_markets(session, {"params": {"limit": "100", **state}})
 
-    try : 
-        with yaspin(text="Processing...",timer=True) as spinner :
-            while True : 
-                resp = list_markets(session,{
-                    'params' : {
-                        'limit' : '100',
-                        **state
-                    }
-                })
-
-                try : 
+                try:
                     payload = resp.json()
-                except Exception as e :
+                except Exception as e:
                     print(f"Couldn't decode response as JSON : {e}")
                     break
 
-                if not isinstance(payload,list) :
+                if not isinstance(payload, list):
                     print(f"Received unknown payload type : {payload},{type(payload)}")
                     break
 
-                if len(payload) == 0 :
+                if len(payload) == 0:
                     print("No data returned. Done scraping!")
                     break
 
-                with open(f"resps/resp_{state['offset']}.jsonl","w") as f :
+                with open(f"resps/resp_{state['offset']}.jsonl", "w") as f:
                     # Create a local copy of the response
                     f.write(str(payload))
 
@@ -78,54 +75,65 @@ def scrape_all_markets() :
                 )
 
                 # Move on to the next page of responses
-                state['offset'] += min(100,len(payload))
+                state["offset"] += min(100, len(payload))
 
                 spinner.text = f"Scraping {state['offset']}th record"
 
-    except Exception as e :
+    except Exception as e:
         print(f"Unknown exception occurred. Error : {e}")
 
     # Create a checkpoint
-    with open("markets_checkpoint.pkl","wb") as f:
-        pickle.dump(state,f)
+    with open("markets_checkpoint.pkl", "wb") as f:
+        pickle.dump(state, f)
 
     return
 
-@backoff.on_exception(backoff.expo,
-                      requests.exceptions.RequestException,
-                      max_tries=5)
-def public_search(session : requests.Session, args : dict):
 
-    url = 'https://gamma-api.polymarket.com/markets'
-    resp : requests.Response = session.get(url,**args)
+@backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
+def public_search(session: requests.Session, args: dict):
 
-    return resp
-
-@backoff.on_exception(backoff.expo,
-                      requests.exceptions.RequestException,
-                      max_tries=5)
-def list_markets(session : requests.Session, args : dict):
-
-    url = 'https://gamma-api.polymarket.com/markets'
-    resp : requests.Response = session.get(url,**args)
+    url = "https://gamma-api.polymarket.com/search"
+    resp: requests.Response = session.get(url, params={**args})
 
     return resp
 
-@backoff.on_exception(backoff.expo,
-                      requests.exceptions.RequestException,
-                      max_tries=5)
-def get_market_positions(session : requests.Session,
-                         market_id : str,
-                         args : dict) :
-    url = 'https://data-api.polymarket.com/markets'
-    resp : requests.Response = session.get(
+
+@backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
+def get_markets(session: requests.Session, args: dict):
+
+    url = "https://gamma-api.polymarket.com/markets"
+    resp: requests.Response = session.get(url, params={**args})
+
+    return resp
+
+
+@backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
+def get_market_positions(session: requests.Session, market_id: str, args: dict):
+    url = "https://data-api.polymarket.com/v1/market-positions"
+    resp: requests.Response = session.get(
         url,
-        market=market_id,
-        **args
+        params={
+            "market": market_id,
+            **args,
+        },
     )
 
     return resp
 
 
-if __name__ == "__main__" :
+@backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
+def get_trades(session: requests.Session, market_id: str, args: dict):
+    url = "https://data-api.polymarket.com/trades"
+    resp: requests.Response = session.get(
+        url,
+        params={
+            "market": market_id,
+            **args,
+        },
+    )
+
+    return resp
+
+
+if __name__ == "__main__":
     scrape_all_markets()
