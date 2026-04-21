@@ -18,3 +18,11 @@ polymarket-scraper/inactive_events.db
 
 
 progress_report copy.ipynb
+
+venv/
+*.db
+resps/
+*.pkl
+
+__pycache__/
+*.csv

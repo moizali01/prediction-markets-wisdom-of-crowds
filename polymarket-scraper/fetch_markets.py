@@ -122,12 +122,12 @@ def get_market_positions(session: requests.Session, market_id: str, args: dict):
 
 
 @backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
-def get_trades(session: requests.Session, market_id: str, args: dict):
+def get_trades(session: requests.Session, condition_id: str, args: dict):
     url = "https://data-api.polymarket.com/trades"
     resp: requests.Response = session.get(
         url,
         params={
-            "market": market_id,
+            "market": condition_id,
             **args,
         },
     )
@@ -135,5 +135,48 @@ def get_trades(session: requests.Session, market_id: str, args: dict):
     return resp
 
 
+@backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
+def get_prices_history(session: requests.Session, args: dict):
+    url = "https://clob.polymarket.com/prices-history"
+    resp: requests.Response = session.get(
+        url,
+        params={**args},
+    )
+
+    return resp
+
+
 if __name__ == "__main__":
-    scrape_all_markets()
+    db = Database("price_history.db")
+    session = LimiterSession(per_second=5)
+    
+    market_ids = ["82855088893985825781350466813737280564000275725006328179621744619327480699369", "55194745453074297560900438908357749978780021444937743754846798173575377021411"]
+
+    for market_id in market_ids:
+        print(f"Fetching price history for Token ID {market_id}...")
+        
+        try:
+            # We can specify an interval like 'max', '1d', '1h', etc. 'max' gives the full history
+            resp = get_prices_history(session, {"market": market_id, "interval": "max"})
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                # The API returns data points under the "history" key natively
+                history = data.get("history", [])
+                
+                print(f"Fetched {len(history)} price history data points for target asset.")
+                
+                if len(history) > 0:
+                    # Add the market_id to each record so you can query multiple markets easily
+                    for record in history:
+                        record["market_id"] = market_id
+                        
+                    db["price_history"].insert_all(history, alter=True)
+                    print("Successfully saved price history to new_assets.db")
+                else:
+                    print("No price history returned for this market.")
+            else:
+                print(f"Error fetching data: HTTP {resp.status_code} - {resp.text}")
+                
+        except Exception as e:
+            print(f"Failed to fetch or parse price history: {e}")
